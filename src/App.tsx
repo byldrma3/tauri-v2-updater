@@ -46,8 +46,14 @@ function App() {
             </div>
             <p>Click on the Tauri, Vite, and React logos to learn more.</p>
 
-            <div className='row'>
-                <p>Version: {version}</p>
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                }}
+            >
+                <p>Version: {version} - yeni</p>
                 <button onClick={checkForAppUpdates}>update</button>
             </div>
         </main>
