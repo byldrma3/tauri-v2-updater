@@ -144,6 +144,19 @@ jobs:
                     echo "jq not found; skipping package.json version sync."
                   fi
 
+            # ---- SIGNING SECRET FORMAT CHECK (fail fast) ----
+            - name: Validate TAURI_SIGNING_PRIVATE_KEY (base64 check)
+              if: ${{ github.ref_type == 'tag' }}
+              shell: bash
+              env:
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+              run: |
+                  bad=$(echo "$TAURI_SIGNING_PRIVATE_KEY" | tr -d 'A-Za-z0-9+/=\n' | wc -c)
+                  if [ "$bad" -ne 0 ]; then
+                    echo "Secret key contains non-base64 chars. Fix TAURI_SIGNING_PRIVATE_KEY."
+                    exit 1
+                  fi
+
             # ---- Tag'de Tauri build + GitHub Release ----
             - name: Build Tauri app
               uses: tauri-apps/tauri-action@v0
@@ -162,6 +175,54 @@ jobs:
                   releaseDraft: false
                   prerelease: false
                   args: ${{ matrix.args }}
+
+            # ---- Artefactları listele (debug) ----
+            - name: List updater artifacts
+              if: ${{ github.ref_type == 'tag' }}
+              shell: bash
+              run: |
+                  echo "=== macOS ARM ==="
+                  ls -lah src-tauri/target/aarch64-apple-darwin/release/bundle/macos || true
+                  echo "=== macOS x64 ==="
+                  ls -lah src-tauri/target/x86_64-apple-darwin/release/bundle/macos || true
+                  echo "=== Windows NSIS ==="
+                  ls -lah src-tauri/target/release/bundle/nsis || true
+                  echo "=== Windows MSI ==="
+                  ls -lah src-tauri/target/release/bundle/msi || true
+
+            # ---- .sig eksikse imzala (garanti) ----
+            - name: Sign updater artifacts if missing
+              if: ${{ github.ref_type == 'tag' }}
+              shell: bash
+              env:
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+              run: |
+                  set -euo pipefail
+                  # 1) macOS ARM
+                  ARM_APP=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz 2>/dev/null || true)
+                  if [[ -n "$ARM_APP" && ! -f "${ARM_APP}.sig" ]]; then
+                    echo "Signing (darwin-aarch64): $ARM_APP"
+                    bunx tauri signer sign --private-key "$TAURI_SIGNING_PRIVATE_KEY" "$ARM_APP" > "${ARM_APP}.sig"
+                  fi
+                  # 2) macOS x64
+                  X64_APP=$(ls src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz 2>/dev/null || true)
+                  if [[ -n "$X64_APP" && ! -f "${X64_APP}.sig" ]]; then
+                    echo "Signing (darwin-x86_64): $X64_APP"
+                    bunx tauri signer sign --private-key "$TAURI_SIGNING_PRIVATE_KEY" "$X64_APP" > "${X64_APP}.sig"
+                  fi
+                  # 3) Windows NSIS
+                  EXE_WIN=$(ls src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null || true)
+                  if [[ -n "$EXE_WIN" && ! -f "${EXE_WIN}.sig" ]]; then
+                    echo "Signing (windows-x86_64): $EXE_WIN"
+                    bunx tauri signer sign --private-key "$TAURI_SIGNING_PRIVATE_KEY" "$EXE_WIN" > "${EXE_WIN}.sig"
+                  fi
+                  # 4) Windows MSI (varsa)
+                  MSI_WIN=$(ls src-tauri/target/release/bundle/msi/*.msi 2>/dev/null || true)
+                  if [[ -n "$MSI_WIN" && ! -f "${MSI_WIN}.sig" ]]; then
+                    echo "Signing (windows-msi-x86_64): $MSI_WIN"
+                    bunx tauri signer sign --private-key "$TAURI_SIGNING_PRIVATE_KEY" "$MSI_WIN" > "${MSI_WIN}.sig"
+                  fi
 
             # 🔽 latest.json üret (v2 updater: .app.tar.gz + .sig)
             - name: Create latest.json (from built artifacts)
