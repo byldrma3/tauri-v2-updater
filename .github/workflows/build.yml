@@ -56,8 +56,15 @@ jobs:
               # NOTE: enterprise developers may hard code a version
               with:
                   node-version: "lts/*"
-                  cache: bun
                   # node-version-file: '.nvmrc'
+
+            - name: Cache Bun dependencies
+              uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+                  restore-keys: |
+                      ${{ runner.os }}-bun-
 
             - name: Install Rust stable
               uses: dtolnay/rust-toolchain@stable # Set this to dtolnay/rust-toolchain@nightly
