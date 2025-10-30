@@ -1,25 +1,17 @@
 import { useState, useCallback, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import "./App.css";
 
 import { checkForAppUpdates } from "./utils/updater.utils";
 
 function App() {
-    const [greetMsg, setGreetMsg] = useState("");
-    const [name, setName] = useState("");
     const [version, setVersion] = useState<string>("");
 
     const handleVersion = useCallback(async () => {
         const v = await getVersion();
         setVersion(v);
     }, []);
-
-    async function greet() {
-        // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-        setGreetMsg(await invoke("greet", { name }));
-    }
 
     useEffect(() => {
         void handleVersion();
@@ -54,24 +46,10 @@ function App() {
             </div>
             <p>Click on the Tauri, Vite, and React logos to learn more.</p>
 
-            <p>Version: {version}</p>
-            <button onClick={checkForAppUpdates}>update</button>
-
-            <form
-                className='row'
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    greet();
-                }}
-            >
-                <input
-                    id='greet-input'
-                    onChange={(e) => setName(e.currentTarget.value)}
-                    placeholder='Enter a name...'
-                />
-                <button type='submit'>Greet</button>
-            </form>
-            <p>{greetMsg}</p>
+            <div className='row'>
+                <p>Version: {version}</p>
+                <button onClick={checkForAppUpdates}>update</button>
+            </div>
         </main>
     );
 }
