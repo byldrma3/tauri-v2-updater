@@ -1,10 +1,15 @@
 name: Publish Release
+
 on:
     push:
         tags:
             - "v*"
         branches: ["*"]
     workflow_dispatch:
+
+# GitHub Releases'a yazmak için gerekli
+permissions:
+    contents: write
 
 env:
     APP_NAME: "Sample Desktop App"
@@ -21,19 +26,19 @@ jobs:
               run: |
                   # NOTE: if commits subjects are standardized, you can filter the git log based on feat: and fix:
                   # and then replace "feat:" with "New: " and "fix:" with "Fixed "
-                  # when AI gets good, we can also summarized commits into a bullet point list
                   PREV_TAG=$(git tag --list v* | tail -n2 | head -n1)
                   echo "changelog=$(git log $PREV_TAG...${{ github.ref_name }} --pretty=format:"- %s")" >> $GITHUB_OUTPUT
         outputs:
             changelog: ${{ steps.build_changelog.outputs.changelog }}
+
     release:
         strategy:
             fail-fast: false
             matrix:
                 include:
-                    - platform: "macos-latest" # for Arm based macs (M1 and above).
+                    - platform: "macos-latest" # Apple Silicon (ARM)
                       args: "--target aarch64-apple-darwin"
-                    - platform: "macos-latest" # for Intel based macs.
+                    - platform: "macos-13" # Intel (x86_64) native runner
                       args: "--target x86_64-apple-darwin"
                     - platform: "windows-latest"
                       args: ""
@@ -43,7 +48,7 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            # build the changelog based on the commit messages between the versioned tags
+            # Node/Bun
             - name: Install Bun
               uses: oven-sh/setup-bun@v2
               with:
@@ -51,10 +56,8 @@ jobs:
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
-              # NOTE: enterprise developers may hard code a version
               with:
                   node-version: "lts/*"
-                  # node-version-file: '.nvmrc'
 
             - name: Cache Bun dependencies
               uses: actions/cache@v4
@@ -64,26 +67,27 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-bun-
 
+            # Rust
             - name: Install Rust stable
-              uses: dtolnay/rust-toolchain@stable # Set this to dtolnay/rust-toolchain@nightly
+              uses: dtolnay/rust-toolchain@stable
               with:
-                  # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
-                  targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+                  targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || (matrix.platform == 'macos-13' && 'x86_64-apple-darwin,aarch64-apple-darwin') || '' }}
 
             - name: Rust cache
               uses: swatinem/rust-cache@v2
               with:
                   workspaces: "./src-tauri -> target"
 
+            # App deps
             - name: Install frontend dependencies
-              run: |
-                  bun install
+              run: bun install
 
+            # Branch build (web build vs) — istersen kaldırabilirsin
             - name: CI Build
               if: ${{ github.ref_type == 'branch' }}
-              run: |
-                  bun run build
+              run: bun run build
 
+            # Branch'ta artifacts (opsiyonel)
             - name: CI upload Windows
               if: ${{ github.ref_type == 'branch' && matrix.platform == 'windows-latest' }}
               uses: actions/upload-artifact@v4
@@ -94,31 +98,116 @@ jobs:
                       src-tauri/release/bundle/nsis/*.exe
 
             - name: CI upload macOS
-              if: ${{ github.ref_type == 'branch' && matrix.platform == 'macos-latest' }}
+              if: ${{ github.ref_type == 'branch' && (matrix.platform == 'macos-latest' || matrix.platform == 'macos-13') }}
               uses: actions/upload-artifact@v4
               with:
                   name: "macOS Installer"
                   path: |
                       src-tauri/release/bundle/dmg/*.dmg
 
-            # TODO: https://tauri.app/v1/guides/building/linux#cross-compiling-tauri-applications-for-arm-based-devices
+            # Tag'de Tauri build + GitHub Release
             - name: Build Tauri app
               uses: tauri-apps/tauri-action@v0
               if: ${{ github.ref_type == 'tag' }}
-              # if u get Error: Resource not accessible by integration
-              # go to repository Settings => Action => General => Workflow permissions => Switch to Read and Write permisions
               env:
                   CI: true
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
               with:
-                  # tauri-action replaces \_\_VERSION\_\_ with the app version
                   tagName: ${{ github.ref_name }}
                   releaseName: "${{ env.APP_NAME }} v__VERSION__"
                   releaseBody: |
-                      ${{needs.changelog.outputs.changelog}}
+                      ${{ needs.changelog.outputs.changelog }}
                       See the assets to download this version and install.
-                  releaseDraft: true
+                  releaseDraft: false # ⬅️ latest/download çalışsın
                   prerelease: false
                   args: ${{ matrix.args }}
+
+            # 🔽 latest.json üret
+            - name: Create latest.json (from built artifacts)
+              if: ${{ github.ref_type == 'tag' }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  VERSION="${GITHUB_REF_NAME#v}"
+                  OWNER="${{ github.repository_owner }}"
+                  REPO="${{ github.event.repository.name }}"
+                  BASE="https://github.com/${OWNER}/${REPO}/releases/download/${GITHUB_REF_NAME}"
+                  NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+                  # macOS ARM
+                  DMG_ARM=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg 2>/dev/null || true)
+                  SIG_ARM=""
+                  if [[ -n "${DMG_ARM}" && -f "${DMG_ARM}.sig" ]]; then
+                    SIG_ARM="$(cat "${DMG_ARM}.sig")"
+                  fi
+
+                  # macOS Intel
+                  DMG_X64=$(ls src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg 2>/dev/null || true)
+                  SIG_X64=""
+                  if [[ -n "${DMG_X64}" && -f "${DMG_X64}.sig" ]]; then
+                    SIG_X64="$(cat "${DMG_X64}.sig")"
+                  fi
+
+                  # Windows NSIS
+                  EXE_WIN=$(ls src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null || true)
+                  SIG_WIN=""
+                  if [[ -n "${EXE_WIN}" && -f "${EXE_WIN}.sig" ]]; then
+                    SIG_WIN="$(cat "${EXE_WIN}.sig")"
+                  fi
+
+                  # Windows MSI (opsiyonel)
+                  MSI_WIN=$(ls src-tauri/target/release/bundle/msi/*.msi 2>/dev/null || true)
+                  SIG_MSI=""
+                  if [[ -n "${MSI_WIN}" && -f "${MSI_WIN}.sig" ]]; then
+                    SIG_MSI="$(cat "${MSI_WIN}.sig")"
+                  fi
+
+                  NOTES="${{ needs.changelog.outputs.changelog }}"
+                  NOTES="${NOTES//$'\n'/\\n}"
+
+                  # JSON yaz
+                  {
+                    echo "{"
+                    echo "  \"version\": \"${VERSION}\","
+                    echo "  \"pub_date\": \"${NOW}\","
+                    echo "  \"notes\": \"${NOTES}\","
+                    echo "  \"platforms\": {"
+                    first=1
+
+                    if [[ -n "$DMG_ARM" && -n "$SIG_ARM" ]]; then
+                      echo "    \"darwin-aarch64\": { \"url\": \"${BASE}/$(basename "$DMG_ARM")\", \"signature\": \"${SIG_ARM}\" }"
+                      first=0
+                    fi
+                    if [[ -n "$DMG_X64" && -n "$SIG_X64" ]]; then
+                      [[ $first -eq 0 ]] && echo ","
+                      echo "    \"darwin-x86_64\": { \"url\": \"${BASE}/$(basename "$DMG_X64")\", \"signature\": \"${SIG_X64}\" }"
+                      first=0
+                    fi
+                    if [[ -n "$EXE_WIN" && -n "$SIG_WIN" ]]; then
+                      [[ $first -eq 0 ]] && echo ","
+                      echo "    \"windows-x86_64\": { \"url\": \"${BASE}/$(basename "$EXE_WIN")\", \"signature\": \"${SIG_WIN}\" }"
+                      first=0
+                    fi
+                    if [[ -n "$MSI_WIN" && -n "$SIG_MSI" ]]; then
+                      [[ $first -eq 0 ]] && echo ","
+                      echo "    \"windows-msi-x86_64\": { \"url\": \"${BASE}/$(basename "$MSI_WIN")\", \"signature\": \"${SIG_MSI}\" }"
+                      first=0
+                    fi
+
+                    echo "  }"
+                    echo "}"
+                  } > latest.json
+
+                  echo "Generated latest.json:"
+                  cat latest.json
+
+            # 🔼 latest.json'ı aynı release'a yükle
+            - name: Upload latest.json to release
+              if: ${{ github.ref_type == 'tag' }}
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: latest.json
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
