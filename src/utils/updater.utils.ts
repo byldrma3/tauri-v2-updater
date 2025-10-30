@@ -5,7 +5,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 export async function checkForAppUpdates() {
     const update = await check();
 
-    if (update?.available) {
+    if (update) {
         const yes = await ask(
             `Update to ${update.version} is available!
             Release notes: ${update.body}`,
