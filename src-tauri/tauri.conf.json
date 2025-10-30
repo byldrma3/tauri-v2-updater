@@ -34,6 +34,8 @@
     },
     "plugins": {
         "updater": {
+            "active": true,
+            "dialog": true,
             "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFCRTMyNjMyNDVCNDcwQTUKUldTbGNMUkZNaWJqcSs2MEdtNmwvNFVNZ3p2MkIzL3FRQ3ZiNm82VkZlaHIxdUtSU3hkV09aZ1IK%",
             "endpoints": [
                 "https://releases.myapp.com/{{target}}/{{arch}}/{{current_version}}",

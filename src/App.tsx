@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+
+import { checkForAppUpdates } from "./utils/updater.utils";
 
 function App() {
     const [greetMsg, setGreetMsg] = useState("");
@@ -13,40 +13,6 @@ function App() {
         // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
         setGreetMsg(await invoke("greet", { name }));
     }
-
-    const update = useCallback(async () => {
-        const result = await check();
-        if (result) {
-            console.log(
-                `found update ${result.version} from ${result.date} with notes ${result.body}`
-            );
-            let downloaded = 0;
-            let contentLength = 0;
-
-            await result.downloadAndInstall((event) => {
-                switch (event.event) {
-                    case "Started":
-                        contentLength = event.data.contentLength ?? 0;
-                        console.log(
-                            `started downloading ${event.data.contentLength} bytes`
-                        );
-                        break;
-                    case "Progress":
-                        downloaded += event.data.chunkLength;
-                        console.log(
-                            `downloaded ${downloaded} from ${contentLength}`
-                        );
-                        break;
-                    case "Finished":
-                        console.log("download finished");
-                        break;
-                }
-            });
-
-            console.log("update installed");
-            await relaunch();
-        }
-    }, []);
 
     return (
         <main className='container'>
@@ -77,7 +43,7 @@ function App() {
             </div>
             <p>Click on the Tauri, Vite, and React logos to learn more.</p>
 
-            <button onClick={update}>update</button>
+            <button onClick={checkForAppUpdates}>update</button>
 
             <form
                 className='row'

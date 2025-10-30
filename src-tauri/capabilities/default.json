@@ -3,5 +3,16 @@
     "identifier": "default",
     "description": "Capability for the main window",
     "windows": ["main"],
-    "permissions": ["core:default", "opener:default", "updater:default"]
+    "permissions": [
+        "core:default",
+        "opener:default",
+        "updater:default",
+        "dialog:default",
+        "dialog:allow-ask",
+        "dialog:allow-message",
+        "updater:default",
+        "updater:allow-check",
+        "updater:allow-download-and-install",
+        "process:allow-restart"
+    ]
 }
