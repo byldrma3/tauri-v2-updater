@@ -19,7 +19,7 @@ function App() {
 
     return (
         <main className='container'>
-            <h1>Welcome to Tauri + React</h1>
+            <h1>🚀 Tauri Updater Demo - v0.1.2</h1>
 
             <div className='row'>
                 <a href='https://vite.dev' target='_blank'>
@@ -53,8 +53,24 @@ function App() {
                     gap: 12,
                 }}
             >
-                <p>Version: {version} - yeni</p>
-                <button onClick={checkForAppUpdates}>update</button>
+                <p style={{fontSize: '18px', fontWeight: 'bold', color: '#4CAF50'}}>
+                    🎉 Güncel Versiyon: {version} - YENİ GÜNCELLEME! 
+                </p>
+                <button 
+                    onClick={checkForAppUpdates}
+                    style={{
+                        padding: '12px 24px',
+                        fontSize: '16px',
+                        backgroundColor: '#2196F3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    🔄 Güncelleme Kontrol Et
+                </button>
             </div>
         </main>
     );

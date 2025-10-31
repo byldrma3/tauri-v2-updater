@@ -10,7 +10,6 @@
         "dialog:default",
         "dialog:allow-ask",
         "dialog:allow-message",
-        "updater:default",
         "updater:allow-check",
         "process:allow-restart",
         "updater:allow-download-and-install"
