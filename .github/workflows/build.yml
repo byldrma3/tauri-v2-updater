@@ -71,7 +71,8 @@ jobs:
               if: matrix.platform == 'windows-latest'
               run: cargo install --force trusted-signing-cli
 
-            - name: Update version in Cargo.toml and tauri.conf.json
+            - name: Update version in Cargo.toml and tauri.conf.json (Unix)
+              if: matrix.platform != 'windows-latest'
               run: |
                   VERSION=${{ github.event.release.tag_name }}
                   VERSION=${VERSION#v}
@@ -87,6 +88,25 @@ jobs:
                   grep "^version" src-tauri/Cargo.toml
                   echo "Updated tauri.conf.json:"
                   grep "\"version\"" src-tauri/tauri.conf.json
+
+            - name: Update version in Cargo.toml and tauri.conf.json (Windows)
+              if: matrix.platform == 'windows-latest'
+              run: |
+                  $VERSION = "${{ github.event.release.tag_name }}"
+                  $VERSION = $VERSION -replace "^v", ""
+                  
+                  # Update Cargo.toml version
+                  (Get-Content src-tauri/Cargo.toml) -replace '^version = ".*"', "version = `"$VERSION`"" | Set-Content src-tauri/Cargo.toml
+                  
+                  # Update tauri.conf.json version
+                  (Get-Content src-tauri/tauri.conf.json) -replace '"version": ".*"', "`"version`": `"$VERSION`"" | Set-Content src-tauri/tauri.conf.json
+                  
+                  # Show the changes
+                  Write-Host "Updated Cargo.toml:"
+                  Select-String -Path src-tauri/Cargo.toml -Pattern "^version"
+                  Write-Host "Updated tauri.conf.json:"
+                  Select-String -Path src-tauri/tauri.conf.json -Pattern '"version"'
+              shell: pwsh
 
             - name: Install frontend dependencies
               run: |
@@ -121,18 +141,29 @@ jobs:
               run: |
                   VERSION=${{ github.event.release.tag_name }}
                   VERSION=${VERSION#v}
+                  
+                  # Wait a bit for the release assets to be available
+                  sleep 10
+                  
+                  # Get the signature from the .sig file
+                  SIGNATURE=$(curl -s "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/updater_darwin_aarch64.app.tar.gz.sig" || echo "")
+                  
                   echo "{
                     \"version\": \"$VERSION\",
                     \"notes\": \"New version $VERSION available\",
                     \"pub_date\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
                     \"platforms\": {
                       \"darwin-aarch64\": {
-                        \"signature\": \"\",
-                        \"url\": \"https://github.com/${{ github.repository }}/releases/download/v$VERSION/updater_${VERSION}_aarch64.app.tar.gz\"
+                        \"signature\": \"$SIGNATURE\",
+                        \"url\": \"https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/updater_darwin_aarch64.app.tar.gz\"
                       }
                     }
                   }" > latest.json
                   
-                  gh release upload v$VERSION latest.json --clobber
+                  # Show the generated latest.json for debugging
+                  echo "Generated latest.json:"
+                  cat latest.json
+                  
+                  gh release upload ${{ github.event.release.tag_name }} latest.json --clobber
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
