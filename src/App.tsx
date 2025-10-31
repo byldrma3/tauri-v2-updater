@@ -53,7 +53,7 @@ function App() {
                     gap: 12,
                 }}
             >
-                <p>Version: {version} - yeni</p>
+                <p>Version: {version} - güncellendi :D</p>
                 <button onClick={checkForAppUpdates}>update</button>
             </div>
         </main>
