@@ -4,22 +4,33 @@ import "./App.css";
 
 import { checkForAppUpdates } from "./utils/updater.utils";
 import { getVersion } from "@tauri-apps/api/app";
+import { check } from "@tauri-apps/plugin-updater";
 
 function App() {
     const [version, setVersion] = useState<string>("");
+    const [update, setUpdate] = useState<boolean>(false);
 
     const handleVersion = useCallback(async () => {
         const v = await getVersion();
         setVersion(v);
     }, []);
 
+    const handleCheckUpdates = useCallback(async () => {
+        const update = await check();
+        setUpdate(!!update);
+    }, []);
+
     useEffect(() => {
         void handleVersion();
     }, [handleVersion]);
 
+    useEffect(() => {
+        void handleCheckUpdates();
+    }, [handleCheckUpdates]);
+
     return (
         <main className='container'>
-            <h1>🚀 Tauri Updater Demo - v0.1.4</h1>
+            <h1>🚀 Tauri Updater Demo - v{version}</h1>
 
             <div className='row'>
                 <a href='https://vite.dev' target='_blank'>
@@ -60,19 +71,22 @@ function App() {
                         color: "#4CAF50",
                     }}
                 >
-                    🎉 Güncel Versiyon: {version} - YENİ GÜNCELLEME!
+                    🎉 Güncel Versiyon: {version}
+                    {update ? " - Güncelleme Bulundu" : ""}
                 </p>
                 <button
                     onClick={checkForAppUpdates}
                     style={{
                         padding: "12px 24px",
                         fontSize: "16px",
-                        backgroundColor: "#2196F3",
+                        backgroundColor: "#175532ff",
                         color: "white",
                         border: "none",
                         borderRadius: "8px",
                         cursor: "pointer",
                         fontWeight: "bold",
+                        width: "fit-content",
+                        margin: "0 auto",
                     }}
                 >
                     🔄 Güncelleme Kontrol Et
