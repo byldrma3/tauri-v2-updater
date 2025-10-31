@@ -2,6 +2,7 @@ name: Generate Artifacts
 on:
     push:
         tags: [v*]
+        branches: [dev]
 
 jobs:
     build-artifacts:
