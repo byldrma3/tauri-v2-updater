@@ -71,6 +71,23 @@ jobs:
               if: matrix.platform == 'windows-latest'
               run: cargo install --force trusted-signing-cli
 
+            - name: Update version in Cargo.toml and tauri.conf.json
+              run: |
+                  VERSION=${{ github.event.release.tag_name }}
+                  VERSION=${VERSION#v}
+                  
+                  # Update Cargo.toml version
+                  sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+                  
+                  # Update tauri.conf.json version
+                  sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+                  
+                  # Show the changes
+                  echo "Updated Cargo.toml:"
+                  grep "^version" src-tauri/Cargo.toml
+                  echo "Updated tauri.conf.json:"
+                  grep "\"version\"" src-tauri/tauri.conf.json
+
             - name: Install frontend dependencies
               run: |
                   bun install
