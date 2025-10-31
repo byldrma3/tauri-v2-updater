@@ -145,8 +145,27 @@ jobs:
                   # Wait a bit for the release assets to be available
                   sleep 10
                   
-                  # Get the signature from the .sig file
-                  SIGNATURE=$(curl -s "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/updater_darwin_aarch64.app.tar.gz.sig" || echo "")
+                  # List all release assets to find the correct signature file
+                  echo "Available release assets:"
+                  gh release view ${{ github.event.release.tag_name }} --json assets --jq '.assets[].name' | grep -E '\.(sig|tar\.gz|app)$'
+                  
+                  # Try different possible signature file names for aarch64
+                  SIGNATURE=""
+                  for sig_file in "updater_darwin_aarch64.app.tar.gz.sig" "updater_darwin_x64.app.tar.gz.sig" "updater.app.tar.gz.sig"; do
+                      echo "Trying signature file: $sig_file"
+                      if curl -s -L "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/$sig_file" -o signature.sig; then
+                          if [ -f signature.sig ] && [ -s signature.sig ]; then
+                              # Read signature and clean it
+                              SIGNATURE=$(cat signature.sig | tr -d '\n\r' | tr -d ' ')
+                              echo "Signature found in $sig_file (length: ${#SIGNATURE}): ${SIGNATURE:0:50}..."
+                              break
+                          fi
+                      fi
+                  done
+                  
+                  if [ -z "$SIGNATURE" ]; then
+                      echo "Warning: No signature file found for darwin-aarch64"
+                  fi
                   
                   echo "{
                     \"version\": \"$VERSION\",
@@ -155,7 +174,7 @@ jobs:
                     \"platforms\": {
                       \"darwin-aarch64\": {
                         \"signature\": \"$SIGNATURE\",
-                        \"url\": \"https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/updater_darwin_aarch64.app.tar.gz\"
+                        \"url\": \"https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/updater_darwin_x64.app.tar.gz\"
                       }
                     }
                   }" > latest.json
