@@ -99,3 +99,23 @@ jobs:
                   releaseDraft: false
                   prerelease: ${{ github.ref != 'refs/heads/main' && github.ref_type != 'tag' }}
                   args: ${{ matrix.args }}
+
+            - name: Create latest.json for updater
+              if: ${{ github.ref == 'refs/heads/dev' && matrix.platform == 'macos-latest' && matrix.args == '--target aarch64-apple-darwin' }}
+              run: |
+                  VERSION=$(cat src-tauri/tauri.conf.json | grep '"version"' | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+                  echo "{
+                    \"version\": \"$VERSION\",
+                    \"notes\": \"New version $VERSION available\",
+                    \"pub_date\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+                    \"platforms\": {
+                      \"darwin-aarch64\": {
+                        \"signature\": \"\",
+                        \"url\": \"https://github.com/${{ github.repository }}/releases/download/v$VERSION/updater_${VERSION}_aarch64.app.tar.gz\"
+                      }
+                    }
+                  }" > latest.json
+                  
+                  gh release upload v$VERSION latest.json --clobber
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
