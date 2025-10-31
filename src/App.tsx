@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
 import { checkForAppUpdates } from "./utils/updater.utils";
+import { getVersion } from "@tauri-apps/api/app";
 
 function App() {
     const [version, setVersion] = useState<string>("");
 
     const handleVersion = useCallback(async () => {
-        const v = await invoke<string>("get_app_version");
+        const v = await getVersion();
         setVersion(v);
     }, []);
 

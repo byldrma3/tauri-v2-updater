@@ -76,13 +76,13 @@ jobs:
               run: |
                   VERSION=${{ github.event.release.tag_name }}
                   VERSION=${VERSION#v}
-                  
+
                   # Update Cargo.toml version
                   sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
-                  
+
                   # Update tauri.conf.json version
                   sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
-                  
+
                   # Show the changes
                   echo "Updated Cargo.toml:"
                   grep "^version" src-tauri/Cargo.toml
@@ -94,13 +94,13 @@ jobs:
               run: |
                   $VERSION = "${{ github.event.release.tag_name }}"
                   $VERSION = $VERSION -replace "^v", ""
-                  
+
                   # Update Cargo.toml version
                   (Get-Content src-tauri/Cargo.toml) -replace '^version = ".*"', "version = `"$VERSION`"" | Set-Content src-tauri/Cargo.toml
-                  
+
                   # Update tauri.conf.json version
                   (Get-Content src-tauri/tauri.conf.json) -replace '"version": ".*"', "`"version`": `"$VERSION`"" | Set-Content src-tauri/tauri.conf.json
-                  
+
                   # Show the changes
                   Write-Host "Updated Cargo.toml:"
                   Select-String -Path src-tauri/Cargo.toml -Pattern "^version"
@@ -141,14 +141,14 @@ jobs:
               run: |
                   VERSION=${{ github.event.release.tag_name }}
                   VERSION=${VERSION#v}
-                  
+
                   # Wait a bit for the release assets to be available
                   sleep 10
-                  
+
                   # List all release assets to find the correct signature file
                   echo "Available release assets:"
                   gh release view ${{ github.event.release.tag_name }} --json assets --jq '.assets[].name' | grep -E '\.(sig|tar\.gz|app)$'
-                  
+
                   # Try different possible signature file names for aarch64
                   SIGNATURE=""
                   for sig_file in "updater_darwin_aarch64.app.tar.gz.sig" "updater_darwin_x64.app.tar.gz.sig" "updater.app.tar.gz.sig"; do
@@ -162,11 +162,11 @@ jobs:
                           fi
                       fi
                   done
-                  
+
                   if [ -z "$SIGNATURE" ]; then
                       echo "Warning: No signature file found for darwin-aarch64"
                   fi
-                  
+
                   echo "{
                     \"version\": \"$VERSION\",
                     \"notes\": \"New version $VERSION available\",
@@ -174,15 +174,15 @@ jobs:
                     \"platforms\": {
                       \"darwin-aarch64\": {
                         \"signature\": \"$SIGNATURE\",
-                        \"url\": \"https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/updater_darwin_x64.app.tar.gz\"
+                        \"url\": \"https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/updater_darwin_aarch64.app.tar.gz\"
                       }
                     }
                   }" > latest.json
-                  
+
                   # Show the generated latest.json for debugging
                   echo "Generated latest.json:"
                   cat latest.json
-                  
+
                   gh release upload ${{ github.event.release.tag_name }} latest.json --clobber
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
