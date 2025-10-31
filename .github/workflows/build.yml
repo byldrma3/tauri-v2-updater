@@ -1,8 +1,7 @@
 name: Generate Artifacts
 on:
-    push:
-        tags: [v*]
-        branches: [dev]
+    release:
+        types: [published]
 
 jobs:
     build-artifacts:
@@ -77,13 +76,11 @@ jobs:
                   bun install
 
             - name: CI Build
-              if: ${{ github.ref_type == 'branch' }}
               run: |
                   bun run build
 
             - name: Build Tauri app
               uses: tauri-apps/tauri-action@v0
-              if: ${{ github.ref_type == 'tag' || github.ref == 'refs/heads/dev' }}
               # if u get Error: Resource not accessible by integration
               # go to repository Settings => Action => General => Workflow permissions => Switch to Read and Write permisions
               env:
@@ -93,8 +90,8 @@ jobs:
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
               with:
                   # tauri-action replaces \_\_VERSION\_\_ with the app version
-                  tagName: ${{ github.ref == 'refs/heads/dev' && 'v0.1.2' || github.ref_name }}
-                  releaseName: "${{ github.ref == 'refs/heads/dev' && 'updater v0.1.2' || format('{0} v__VERSION__', env.APP_NAME) }}"
+                  tagName: ${{ github.event.release.tag_name }}
+                  releaseName: "${{ github.event.release.name }}"
                   releaseBody: |
                       ${{needs.changelog.outputs.changelog}}
                       See the assets to download this version and install.
@@ -103,9 +100,10 @@ jobs:
                   args: ${{ matrix.args }}
 
             - name: Create latest.json for updater
-              if: ${{ github.ref == 'refs/heads/dev' && matrix.platform == 'macos-latest' && matrix.args == '--target aarch64-apple-darwin' }}
+              if: ${{ matrix.platform == 'macos-latest' && matrix.args == '--target aarch64-apple-darwin' }}
               run: |
-                  VERSION=$(cat src-tauri/tauri.conf.json | grep '"version"' | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+                  VERSION=${{ github.event.release.tag_name }}
+                  VERSION=${VERSION#v}
                   echo "{
                     \"version\": \"$VERSION\",
                     \"notes\": \"New version $VERSION available\",
